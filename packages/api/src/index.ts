@@ -93,6 +93,9 @@ async function start() {
   }
 }
 
-start();
+// Only start the server when running directly (not when imported as a module)
+if (process.env.VERCEL !== '1') {
+  start();
+}
 
 export { buildApp };

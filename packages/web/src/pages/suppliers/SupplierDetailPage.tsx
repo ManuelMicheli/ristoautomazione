@@ -18,6 +18,15 @@ import {
   FileText,
   Clock,
   User,
+  Upload,
+  Check,
+  ChevronRight,
+  Loader2,
+  ArrowUp,
+  ArrowDown,
+  Minus as MinusIcon,
+  Package,
+  Search,
 } from 'lucide-react';
 
 const SupplierScorecard = lazy(() => import('./SupplierScorecard'));
@@ -45,6 +54,7 @@ import {
   type ColumnDef,
   type TabItem,
 } from '@/components/ui';
+import { useMemo } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -132,6 +142,7 @@ const DOC_TYPES = [
 const TAB_ITEMS: TabItem[] = [
   { value: 'info', label: 'Informazioni' },
   { value: 'contacts', label: 'Contatti' },
+  { value: 'catalog', label: 'Catalogo' },
   { value: 'documents', label: 'Documenti' },
   { value: 'orders', label: 'Ordini' },
   { value: 'performance', label: 'Performance' },
@@ -870,6 +881,504 @@ function HistoryTab({ supplierId }: { supplierId: string }) {
   );
 }
 
+/* -- Catalog Tab -- */
+
+interface CatalogProduct {
+  id: string;
+  name: string;
+  category: string | null;
+  unit: string | null;
+  supplierCode: string | null;
+  currentPrice: number;
+  isActive: boolean;
+}
+
+interface CatalogImportParse {
+  headers: string[];
+  columnMapping: Record<string, number>;
+  preview: Record<string, string>[];
+  totalRows: number;
+  allData: Record<string, string>[];
+}
+
+interface CatalogImportResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  alerts: { productName: string; oldPrice: number; newPrice: number; changePercent: number }[];
+  errors: { row: number; message: string }[];
+}
+
+const IMPORT_TARGET_FIELDS = [
+  { value: '', label: 'Non mappare' },
+  { value: 'product_name', label: 'Nome Prodotto' },
+  { value: 'supplier_code', label: 'Codice Fornitore' },
+  { value: 'price', label: 'Prezzo' },
+  { value: 'unit', label: 'Unita di Misura' },
+];
+
+function CatalogTab({ supplierId, supplierName }: { supplierId: string; supplierName: string }) {
+  const [importing, setImporting] = useState(false);
+  const [importStep, setImportStep] = useState(1);
+  const [parseResult, setParseResult] = useState<CatalogImportParse | null>(null);
+  const [columnMapping, setColumnMapping] = useState<Record<string, number>>({});
+  const [importResult, setImportResult] = useState<CatalogImportResult | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch current catalog products
+  const { data: catalogData, isLoading } = useQuery<{ data: CatalogProduct[]; total: number }>({
+    queryKey: ['supplier', supplierId, 'catalog'],
+    queryFn: async () => {
+      const res = await apiClient.get<any[]>('/products', {
+        supplierId,
+        pageSize: 100,
+      });
+      // Map to our CatalogProduct type
+      const items: CatalogProduct[] = (res.data || []).map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        category: p.category,
+        unit: p.unit,
+        supplierCode: p.supplierCode || null,
+        currentPrice: p.currentPrice ?? p.price ?? 0,
+        isActive: p.isActive !== false,
+      }));
+      return { data: items, total: res.pagination?.total ?? items.length };
+    },
+  });
+
+  const products = catalogData?.data ?? [];
+
+  const filteredProducts = useMemo(() => {
+    if (!searchQuery.trim()) return products;
+    const q = searchQuery.toLowerCase();
+    return products.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.supplierCode && p.supplierCode.toLowerCase().includes(q)) ||
+        (p.category && p.category.toLowerCase().includes(q)),
+    );
+  }, [products, searchQuery]);
+
+  // Step 1: Upload CSV
+  const uploadMutation = useMutation({
+    mutationFn: (files: File[]) => {
+      const formData = new FormData();
+      files.forEach((f) => formData.append('file', f));
+      return apiClient.upload<CatalogImportParse>('/price-lists/import', formData);
+    },
+    onSuccess: (res) => {
+      setParseResult(res.data);
+      setColumnMapping(res.data.columnMapping || {});
+      setImportStep(2);
+    },
+    onError: () => toast('Errore nel caricamento del file', 'error'),
+  });
+
+  // Step 2 -> 3: Confirm import
+  const confirmMutation = useMutation({
+    mutationFn: () =>
+      apiClient.post<CatalogImportResult>('/price-lists/confirm', {
+        supplierId,
+        columnMapping,
+        data: parseResult?.allData ?? [],
+      }),
+    onSuccess: (res) => {
+      setImportResult(res.data);
+      setImportStep(3);
+      queryClient.invalidateQueries({ queryKey: ['supplier', supplierId, 'catalog'] });
+      queryClient.invalidateQueries({ queryKey: ['supplier', supplierId] });
+      toast('Catalogo importato con successo', 'success');
+    },
+    onError: () => toast("Errore nell'importazione del catalogo", 'error'),
+  });
+
+  const resetImport = () => {
+    setImporting(false);
+    setImportStep(1);
+    setParseResult(null);
+    setColumnMapping({});
+    setImportResult(null);
+  };
+
+  const updateMappingField = (field: string, colIndex: number | '') => {
+    setColumnMapping((prev) => {
+      const next = { ...prev };
+      // Remove field from old position
+      Object.keys(next).forEach((k) => {
+        if (k === field) delete next[k];
+      });
+      // Assign new position
+      if (colIndex !== '') {
+        next[field] = colIndex as number;
+      }
+      return next;
+    });
+  };
+
+  // Catalog product table columns
+  const catalogColumns: ColumnDef<CatalogProduct>[] = [
+    {
+      key: 'name',
+      header: 'Prodotto',
+      cell: (row) => (
+        <span className="font-medium text-slate-900 dark:text-white">{row.name}</span>
+      ),
+    },
+    {
+      key: 'supplierCode',
+      header: 'Cod. Fornitore',
+      cell: (row) => (
+        <span className="text-slate-500">{row.supplierCode || '-'}</span>
+      ),
+    },
+    {
+      key: 'category',
+      header: 'Categoria',
+      cell: (row) =>
+        row.category ? <Badge variant="neutral">{row.category}</Badge> : <span className="text-slate-400">-</span>,
+    },
+    {
+      key: 'unit',
+      header: 'U.M.',
+      cell: (row) => <span className="text-slate-500">{row.unit || '-'}</span>,
+    },
+    {
+      key: 'currentPrice',
+      header: 'Prezzo',
+      cell: (row) => (
+        <span className="tabular-nums font-medium">{formatCurrency(row.currentPrice)}</span>
+      ),
+    },
+  ];
+
+  // --- Import Wizard ---
+  if (importing) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+            Importa Catalogo - {supplierName}
+          </h3>
+          <Button variant="ghost" onClick={resetImport}>
+            Annulla
+          </Button>
+        </div>
+
+        {/* Step indicator */}
+        <div className="flex items-center justify-center gap-2">
+          {[
+            { num: 1, label: 'Carica File' },
+            { num: 2, label: 'Mappatura Colonne' },
+            { num: 3, label: 'Risultato' },
+          ].map((step, i) => (
+            <div key={step.num} className="flex items-center gap-2">
+              <div
+                className={cn(
+                  'flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium',
+                  importStep > step.num
+                    ? 'bg-accent-green text-white'
+                    : importStep === step.num
+                      ? 'bg-accent-green/10 text-accent-green ring-2 ring-accent-green'
+                      : 'bg-slate-100 text-slate-400 dark:bg-slate-700',
+                )}
+              >
+                {importStep > step.num ? <Check className="h-4 w-4" /> : step.num}
+              </div>
+              <span
+                className={cn(
+                  'hidden text-sm sm:inline',
+                  importStep >= step.num
+                    ? 'font-medium text-slate-900 dark:text-white'
+                    : 'text-slate-400',
+                )}
+              >
+                {step.label}
+              </span>
+              {i < 2 && <ChevronRight className="h-4 w-4 text-slate-300" />}
+            </div>
+          ))}
+        </div>
+
+        {/* Step 1: Upload */}
+        {importStep === 1 && (
+          <Card>
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                Carica un file CSV o Excel con il catalogo del fornitore.
+                Il file verra analizzato e potrai mappare le colonne nella fase successiva.
+              </p>
+              <div className="rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
+                <p className="mb-2 text-xs font-medium text-slate-500">Formato atteso:</p>
+                <div className="overflow-x-auto">
+                  <table className="text-xs text-slate-600 dark:text-slate-400">
+                    <thead>
+                      <tr>
+                        <th className="px-3 py-1 text-left font-medium">Nome Prodotto</th>
+                        <th className="px-3 py-1 text-left font-medium">Codice</th>
+                        <th className="px-3 py-1 text-left font-medium">Prezzo</th>
+                        <th className="px-3 py-1 text-left font-medium">U.M.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="px-3 py-1">Pomodoro San Marzano</td>
+                        <td className="px-3 py-1">PM001</td>
+                        <td className="px-3 py-1">2,50</td>
+                        <td className="px-3 py-1">kg</td>
+                      </tr>
+                      <tr>
+                        <td className="px-3 py-1">Mozzarella di Bufala</td>
+                        <td className="px-3 py-1">MB002</td>
+                        <td className="px-3 py-1">8,90</td>
+                        <td className="px-3 py-1">kg</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {uploadMutation.isPending ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-accent-green" />
+                  <p className="mt-3 text-sm text-slate-500">Analisi del file in corso...</p>
+                </div>
+              ) : (
+                <FileUpload
+                  accept=".csv,.xlsx,.xls"
+                  maxSize={10 * 1024 * 1024}
+                  onFiles={(files) => uploadMutation.mutate(files)}
+                />
+              )}
+            </div>
+          </Card>
+        )}
+
+        {/* Step 2: Column Mapping */}
+        {importStep === 2 && parseResult && (
+          <div className="space-y-6">
+            <Card header="Mappatura Colonne">
+              <p className="mb-4 text-sm text-slate-500">
+                Associa ciascun campo al colonna corrispondente del file.
+                Trovate <strong>{parseResult.totalRows}</strong> righe.
+              </p>
+              <div className="space-y-3">
+                {IMPORT_TARGET_FIELDS.filter((f) => f.value).map((field) => {
+                  const currentCol = columnMapping[field.value];
+                  const colOptions = [
+                    { value: '', label: 'Non mappare' },
+                    ...parseResult.headers.map((h, i) => ({
+                      value: String(i),
+                      label: h,
+                    })),
+                  ];
+                  return (
+                    <div
+                      key={field.value}
+                      className="flex items-center gap-4 rounded-lg border border-slate-200 p-3 dark:border-slate-700"
+                    >
+                      <span className="min-w-[160px] text-sm font-medium text-slate-700 dark:text-slate-300">
+                        {field.label}
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+                      <Select
+                        options={colOptions}
+                        value={currentCol !== undefined ? String(currentCol) : ''}
+                        onChange={(v) =>
+                          updateMappingField(field.value, v ? parseInt(v as string, 10) : '')
+                        }
+                        placeholder="Seleziona colonna"
+                        className="flex-1"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+
+            {/* Sample data preview */}
+            {parseResult.preview.length > 0 && (
+              <Card header="Anteprima Dati (prime 5 righe)">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-700">
+                        {parseResult.headers.map((col) => (
+                          <th
+                            key={col}
+                            className="px-3 py-2 text-left text-xs font-medium uppercase text-slate-500"
+                          >
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parseResult.preview.slice(0, 5).map((row, i) => (
+                        <tr
+                          key={i}
+                          className="border-b border-slate-100 dark:border-slate-700/50"
+                        >
+                          {parseResult.headers.map((col) => (
+                            <td
+                              key={col}
+                              className="px-3 py-2 text-slate-700 dark:text-slate-300"
+                            >
+                              {row[col] || '-'}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+
+            <div className="flex justify-between">
+              <Button variant="ghost" onClick={() => setImportStep(1)}>
+                Indietro
+              </Button>
+              <Button
+                onClick={() => confirmMutation.mutate()}
+                loading={confirmMutation.isPending}
+                disabled={
+                  !columnMapping.product_name && !columnMapping.supplier_code
+                }
+              >
+                Conferma Importazione
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Result */}
+        {importStep === 3 && importResult && (
+          <Card>
+            <div className="py-8 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent-green/10">
+                <Check className="h-8 w-8 text-accent-green" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                Importazione Completata
+              </h2>
+              <p className="mt-2 text-sm text-slate-500">
+                Il catalogo di {supplierName} e stato aggiornato.
+              </p>
+
+              <div className="mx-auto mt-6 grid max-w-md grid-cols-3 gap-4">
+                <div>
+                  <p className="text-2xl font-bold text-accent-green">{importResult.created}</p>
+                  <p className="text-xs text-slate-500">Nuovi prodotti</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-blue-600">{importResult.updated}</p>
+                  <p className="text-xs text-slate-500">Prezzi aggiornati</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-400">{importResult.skipped}</p>
+                  <p className="text-xs text-slate-500">Righe saltate</p>
+                </div>
+              </div>
+
+              {importResult.alerts.length > 0 && (
+                <div className="mx-auto mt-6 max-w-lg rounded-lg border border-amber-200 bg-amber-50 p-4 text-left dark:border-amber-800 dark:bg-amber-900/20">
+                  <p className="mb-2 text-sm font-medium text-amber-700 dark:text-amber-300">
+                    Avvisi Prezzo ({importResult.alerts.length}):
+                  </p>
+                  <ul className="space-y-1 text-xs text-amber-600 dark:text-amber-400">
+                    {importResult.alerts.map((alert, i) => (
+                      <li key={i} className="flex items-center gap-1">
+                        <ArrowUp className="h-3 w-3" />
+                        {alert.productName}: {formatCurrency(alert.oldPrice)} → {formatCurrency(alert.newPrice)}
+                        <span className="font-medium">(+{alert.changePercent}%)</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {importResult.errors.length > 0 && (
+                <div className="mx-auto mt-4 max-w-lg rounded-lg border border-red-200 bg-red-50 p-4 text-left dark:border-red-800 dark:bg-red-900/20">
+                  <p className="mb-2 text-sm font-medium text-red-700 dark:text-red-300">
+                    Errori ({importResult.errors.length}):
+                  </p>
+                  <ul className="space-y-1 text-xs text-red-600 dark:text-red-400">
+                    {importResult.errors.map((err, i) => (
+                      <li key={i}>Riga {err.row}: {err.message}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="mt-8 flex justify-center gap-3">
+                <Button variant="outline" onClick={resetImport}>
+                  Chiudi
+                </Button>
+                <Button
+                  onClick={() => {
+                    setImportStep(1);
+                    setParseResult(null);
+                    setImportResult(null);
+                  }}
+                >
+                  Nuova Importazione
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
+      </div>
+    );
+  }
+
+  // --- Catalog List View ---
+  if (isLoading) {
+    return <div className="space-y-3"><Skeleton variant="rect" height={80} count={3} /></div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative flex-1 sm:max-w-xs">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Cerca nel catalogo..."
+            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:border-accent-green focus:outline-none focus:ring-1 focus:ring-accent-green dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder-slate-500"
+          />
+        </div>
+        <Button
+          icon={<Upload className="h-4 w-4" />}
+          onClick={() => setImporting(true)}
+        >
+          Importa Catalogo CSV/Excel
+        </Button>
+      </div>
+
+      {products.length === 0 ? (
+        <EmptyState
+          icon={Package}
+          title="Nessun prodotto nel catalogo"
+          description="Importa il catalogo del fornitore tramite file CSV o Excel."
+          actionLabel="Importa Catalogo"
+          onAction={() => setImporting(true)}
+        />
+      ) : (
+        <>
+          <p className="text-sm text-slate-500">
+            {filteredProducts.length} prodotti{searchQuery && ` trovati su ${products.length}`}
+          </p>
+          <DataTable columns={catalogColumns} data={filteredProducts} />
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Main Page Component                                                */
 /* ------------------------------------------------------------------ */
@@ -990,6 +1499,9 @@ export default function SupplierDetailPage() {
           <InfoTab supplier={supplier} onUpdate={handleRefresh} />
         )}
         {activeTab === 'contacts' && <ContactsTab supplierId={supplier.id} />}
+        {activeTab === 'catalog' && (
+          <CatalogTab supplierId={supplier.id} supplierName={supplier.businessName} />
+        )}
         {activeTab === 'documents' && <DocumentsTab supplierId={supplier.id} />}
         {activeTab === 'orders' && <OrdersTab supplierId={supplier.id} />}
         {activeTab === 'performance' && (
