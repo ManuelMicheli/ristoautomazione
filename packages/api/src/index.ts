@@ -41,7 +41,9 @@ async function buildApp() {
 
   // Plugins
   await app.register(cors, {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    origin: process.env.CORS_ORIGIN
+      ? process.env.CORS_ORIGIN.split(',')
+      : 'http://localhost:5173',
     credentials: true,
   });
   await app.register(helmet);
@@ -93,9 +95,6 @@ async function start() {
   }
 }
 
-// Only start the server when running directly (not when imported as a module)
-if (process.env.VERCEL !== '1') {
-  start();
-}
+start();
 
 export { buildApp };
