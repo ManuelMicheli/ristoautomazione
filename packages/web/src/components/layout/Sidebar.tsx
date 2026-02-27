@@ -12,6 +12,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
+  Sparkles,
+  Repeat,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -77,6 +79,8 @@ const navSections: NavSection[] = [
   {
     title: 'Acquisti',
     items: [
+      { label: 'Lista della Spesa', path: '/spesa', icon: Sparkles },
+      { label: 'Template Ordini', path: '/spesa/templates', icon: Repeat },
       { label: 'Fornitori', path: '/suppliers', icon: Building2 },
       { label: 'Prodotti', path: '/products', icon: Package },
       { label: 'Ordini', path: '/orders', icon: ShoppingCart },

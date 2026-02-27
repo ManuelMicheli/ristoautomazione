@@ -178,12 +178,24 @@ export class SupplierService {
       }
     }
 
-    const data = rows.map((row) => ({
-      ...row,
-      contactsCount: contactCounts[row.id] || 0,
-      productsCount: productCounts[row.id] || 0,
-      lastOrderDate: lastOrderDates[row.id] || null,
-    }));
+    const data = rows.map((row) => {
+      // Extract numeric score from scoreData JSON
+      const sd = row.scoreData as any;
+      const score: number | null =
+        sd && typeof sd === 'object' && typeof sd.overall === 'number'
+          ? sd.overall
+          : sd && typeof sd === 'number'
+            ? sd
+            : null;
+
+      return {
+        ...row,
+        score,
+        contactsCount: contactCounts[row.id] || 0,
+        activeProducts: productCounts[row.id] || 0,
+        lastOrderDate: lastOrderDates[row.id] || null,
+      };
+    });
 
     return {
       data,

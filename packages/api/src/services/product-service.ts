@@ -234,12 +234,19 @@ export class ProductService {
 
     const enrichedProducts = productRows.map((p: any) => {
       const bp = bestPriceMap.get(p.id);
+
+      // Build certifications array from boolean flags
+      const certifications: string[] = [];
+      if (p.isBio) certifications.push('BIO');
+      if (p.isDop) certifications.push('DOP');
+      if (p.isIgp) certifications.push('IGP');
+
       return {
         ...p,
         supplierCount: supplierCountMap.get(p.id) || 0,
-        bestPrice: bp
-          ? { price: parseFloat(bp.price), supplierName: bp.supplierName }
-          : null,
+        bestPrice: bp ? parseFloat(bp.price) : null,
+        bestPriceSupplier: bp ? bp.supplierName : null,
+        certifications,
         priceTrend: trendMap.get(p.id) || null,
       };
     });

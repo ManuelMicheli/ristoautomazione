@@ -115,4 +115,110 @@ export async function analyticsRoutes(app: FastifyInstance) {
       return { success: true, data };
     },
   });
+
+  // -------------------------------------------------------------------------
+  // GET /analytics/dashboard — aggregated dashboard stats for frontend
+  // -------------------------------------------------------------------------
+  app.get('/dashboard', {
+    preHandler: [requirePermission('analytics', 'read')],
+    handler: async (request, reply) => {
+      const redis = getRedis();
+      const tenantId = request.user.tenantId;
+
+      const [summary, overview] = await Promise.all([
+        AnalyticsService.summary(app.db, redis, tenantId),
+        AnalyticsService.spendingOverview(app.db, redis, tenantId, 'month'),
+      ]);
+
+      const trendValue = overview.percentChange.vsPrevious;
+      const data = {
+        monthlySpend: summary.totalSpendThisMonth,
+        monthlySpendTrend: {
+          value: Math.abs(trendValue),
+          direction: trendValue >= 0 ? 'up' : 'down',
+        },
+        activeOrders: summary.ordersThisMonth,
+        activeAlerts: summary.expiringDocuments + summary.unverifiedInvoices,
+        pendingActions: summary.pendingApprovals,
+      };
+
+      return { success: true, data };
+    },
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /analytics/category-breakdown — alias for spending-by-category
+  // -------------------------------------------------------------------------
+  app.get('/category-breakdown', {
+    preHandler: [requirePermission('analytics', 'read')],
+    handler: async (request, reply) => {
+      const { period } = periodQuerySchema.parse(request.query);
+      const data = await AnalyticsService.spendingByCategory(
+        app.db,
+        getRedis(),
+        request.user.tenantId,
+        period,
+      );
+      return { success: true, data };
+    },
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /analytics/alerts — active alerts and notifications
+  // -------------------------------------------------------------------------
+  app.get('/alerts', {
+    preHandler: [requirePermission('analytics', 'read')],
+    handler: async (request, reply) => {
+      const redis = getRedis();
+      const tenantId = request.user.tenantId;
+      const summary = await AnalyticsService.summary(app.db, redis, tenantId);
+      const alerts: Array<{
+        id: string;
+        type: string;
+        title: string;
+        description: string;
+        severity: string;
+        createdAt: string;
+        actionUrl?: string;
+      }> = [];
+
+      if (summary.pendingApprovals > 0) {
+        alerts.push({
+          id: 'alert-pending-approvals',
+          type: 'action_required',
+          title: `${summary.pendingApprovals} ordini in attesa di approvazione`,
+          description: 'Ci sono ordini che richiedono la tua approvazione.',
+          severity: 'warning',
+          createdAt: new Date().toISOString(),
+          actionUrl: '/orders?status=pending_approval',
+        });
+      }
+
+      if (summary.unverifiedInvoices > 0) {
+        alerts.push({
+          id: 'alert-unverified-invoices',
+          type: 'action_required',
+          title: `${summary.unverifiedInvoices} fatture da verificare`,
+          description: 'Ci sono fatture in attesa di verifica OCR o revisione manuale.',
+          severity: 'info',
+          createdAt: new Date().toISOString(),
+          actionUrl: '/invoices?status=pending_review',
+        });
+      }
+
+      if (summary.expiringDocuments > 0) {
+        alerts.push({
+          id: 'alert-expiring-docs',
+          type: 'expiring_contract',
+          title: `${summary.expiringDocuments} documenti in scadenza`,
+          description: 'Alcuni documenti fornitore scadranno nei prossimi 30 giorni.',
+          severity: 'warning',
+          createdAt: new Date().toISOString(),
+          actionUrl: '/suppliers',
+        });
+      }
+
+      return { success: true, data: alerts };
+    },
+  });
 }

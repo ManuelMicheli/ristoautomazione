@@ -43,8 +43,8 @@ export default function LoginPage() {
     setServerError(null);
     try {
       const response = await apiClient.post<LoginResponse>('/auth/login', data);
-      const { user, tokens } = response.data;
-      login(user, tokens.accessToken, tokens.refreshToken);
+      const { user, accessToken, refreshToken } = response.data;
+      login(user, accessToken, refreshToken);
       navigate('/dashboard', { replace: true });
     } catch (error) {
       if (error instanceof ApiError) {
@@ -161,6 +161,37 @@ export default function LoginPage() {
               ) : (
                 'Accedi'
               )}
+            </button>
+
+            {/* Demo mode divider */}
+            <div className="my-5 flex items-center gap-3">
+              <div className="h-px flex-1 bg-slate-700" />
+              <span className="text-xs text-slate-500">oppure</span>
+              <div className="h-px flex-1 bg-slate-700" />
+            </div>
+
+            {/* Demo login button */}
+            <button
+              type="button"
+              onClick={() => {
+                login(
+                  {
+                    id: 'c0000000-0000-0000-0000-000000000001',
+                    email: 'admin@demo.it',
+                    role: 'owner',
+                    firstName: 'Admin',
+                    lastName: 'Demo',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                  },
+                  'demo-token',
+                  'demo-refresh-token'
+                );
+                navigate('/dashboard', { replace: true });
+              }}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-600 px-4 py-3 text-sm font-medium text-slate-300 transition-all duration-200 hover:border-slate-500 hover:bg-slate-700/50"
+            >
+              Accedi in modalita Demo
             </button>
           </form>
         </div>

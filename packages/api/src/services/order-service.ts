@@ -6,6 +6,7 @@ import {
   supplierProducts,
   auditLog,
   locations,
+  users,
 } from '@cph/db';
 import {
   eq,
@@ -120,8 +121,8 @@ export class OrderService {
 
     const sortFn = sortDir === 'asc' ? asc : desc;
 
-    // Fetch orders with supplier name and line count
-    const orders = await db
+    // Fetch orders with supplier name, creator name, and line count
+    const orderRows = await db
       .select({
         id: purchaseOrders.id,
         tenantId: purchaseOrders.tenantId,
@@ -140,6 +141,8 @@ export class OrderService {
         isUrgent: purchaseOrders.isUrgent,
         isRecurringTemplate: purchaseOrders.isRecurringTemplate,
         createdBy: purchaseOrders.createdBy,
+        creatorFirstName: users.firstName,
+        creatorLastName: users.lastName,
         createdAt: purchaseOrders.createdAt,
         updatedAt: purchaseOrders.updatedAt,
         linesCount: sql<number>`(
@@ -150,10 +153,19 @@ export class OrderService {
       })
       .from(purchaseOrders)
       .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
+      .leftJoin(users, eq(purchaseOrders.createdBy, users.id))
       .where(whereClause)
       .orderBy(sortFn(sortColumn))
       .limit(pageSize)
       .offset((page - 1) * pageSize);
+
+    const orders = orderRows.map((o: any) => ({
+      ...o,
+      totalAmount: parseFloat(o.totalAmount || '0'),
+      createdByName: o.creatorFirstName && o.creatorLastName
+        ? `${o.creatorFirstName} ${o.creatorLastName}`
+        : o.createdBy,
+    }));
 
     return {
       data: orders,

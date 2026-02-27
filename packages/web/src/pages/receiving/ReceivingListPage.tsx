@@ -25,13 +25,12 @@ import { it } from 'date-fns/locale';
 
 interface ExpectedDelivery {
   id: string;
-  orderId: string;
   orderNumber: string;
   supplierId: string;
   supplierName: string;
-  expectedDate: string;
+  expectedDeliveryDate: string;
   totalAmount: number;
-  itemCount: number;
+  linesCount: number;
   status: string;
 }
 
@@ -40,16 +39,16 @@ interface RecentReceiving {
   orderId: string;
   orderNumber: string;
   supplierName: string;
-  receivedDate: string;
-  itemCount: number;
-  nonConformityCount: number;
+  receivedAt: string;
+  linesCount: number;
+  nonConformitiesCount: number;
   status: string;
 }
 
 interface ExpectedResponse {
   today: ExpectedDelivery[];
   thisWeek: ExpectedDelivery[];
-  upcoming: ExpectedDelivery[];
+  later: ExpectedDelivery[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -85,11 +84,11 @@ function DeliveryCard({
             <span className="tabular-nums">{formatCurrency(delivery.totalAmount)}</span>
             <span className="flex items-center gap-1">
               <Package className="h-3.5 w-3.5" />
-              {delivery.itemCount} articoli
+              {delivery.linesCount} articoli
             </span>
             <span className="flex items-center gap-1">
               <Calendar className="h-3.5 w-3.5" />
-              {formatDateShort(delivery.expectedDate)}
+              {formatDateShort(delivery.expectedDeliveryDate)}
             </span>
           </div>
         </div>
@@ -99,7 +98,7 @@ function DeliveryCard({
           icon={<ArrowRight className="h-5 w-5" />}
           iconPosition="right"
           loading={isStarting}
-          onClick={() => onStart(delivery.orderId)}
+          onClick={() => onStart(delivery.id)}
           className="min-h-[48px] min-w-[180px]"
         >
           Inizia Ricezione
@@ -127,14 +126,14 @@ function RecentCard({ receiving }: { receiving: RecentReceiving }) {
             {receiving.supplierName}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            {formatDate(receiving.receivedDate)} &middot; #{receiving.orderNumber} &middot; {receiving.itemCount} articoli
+            {formatDate(receiving.receivedAt)} &middot; #{receiving.orderNumber} &middot; {receiving.linesCount} articoli
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {receiving.nonConformityCount > 0 ? (
+          {receiving.nonConformitiesCount > 0 ? (
             <Badge variant="error">
               <AlertTriangle className="mr-1 h-3 w-3" />
-              {receiving.nonConformityCount} NC
+              {receiving.nonConformitiesCount} NC
             </Badge>
           ) : (
             <Badge variant="success">
@@ -202,7 +201,7 @@ export default function ReceivingListPage() {
     queryFn: async () => {
       const res = await apiClient.get<RecentReceiving[]>('/receivings', {
         pageSize: 5,
-        sortBy: 'receivedDate',
+        sortBy: 'createdAt',
         sortDir: 'desc',
       });
       return res.data;
@@ -227,7 +226,7 @@ export default function ReceivingListPage() {
   /* --- Sections data --- */
   const todayDeliveries = useMemo(() => expected?.today ?? [], [expected]);
   const weekDeliveries = useMemo(() => expected?.thisWeek ?? [], [expected]);
-  const upcomingDeliveries = useMemo(() => expected?.upcoming ?? [], [expected]);
+  const upcomingDeliveries = useMemo(() => expected?.later ?? [], [expected]);
   const hasDeliveries = todayDeliveries.length + weekDeliveries.length + upcomingDeliveries.length > 0;
 
   /* --- Error --- */

@@ -92,6 +92,14 @@ const InvoiceDiscrepanciesPage = React.lazy(
   () => import('@/pages/invoices/InvoiceDiscrepanciesPage')
 );
 
+// Lazy-loaded pages - Shopping
+const ShoppingListPage = React.lazy(
+  () => import('@/pages/shopping/ShoppingListPage')
+);
+const ShoppingTemplatesPage = React.lazy(
+  () => import('@/pages/shopping/ShoppingTemplatesPage')
+);
+
 // Lazy-loaded pages - Settings
 const SettingsPage = React.lazy(
   () => import('@/pages/settings/SettingsPage')
@@ -138,6 +146,10 @@ export default function App() {
           <Route path="products/new" element={<ProductNewPage />} />
           <Route path="products/import" element={<ProductImportPage />} />
           <Route path="products/:id" element={<ProductDetailPage />} />
+
+          {/* Shopping */}
+          <Route path="spesa" element={<ShoppingListPage />} />
+          <Route path="spesa/templates" element={<ShoppingTemplatesPage />} />
 
           {/* Orders */}
           <Route path="orders" element={<OrdersListPage />} />

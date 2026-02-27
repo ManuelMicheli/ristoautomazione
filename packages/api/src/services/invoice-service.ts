@@ -1,4 +1,4 @@
-import { eq, and, isNull, desc, sql, gte, lte, count } from 'drizzle-orm';
+import { eq, and, isNull, desc, asc, sql, gte, lte, count } from 'drizzle-orm';
 import {
   invoices,
   invoiceLines,
@@ -23,10 +23,23 @@ export class InvoiceService {
       supplierId?: string;
       dateFrom?: string;
       dateTo?: string;
+      sortBy?: string;
+      sortDir?: string;
     },
   ) {
     const page = filters.page || 1;
     const pageSize = filters.pageSize || 20;
+
+    // Map frontend status values to internal DB statuses
+    const reverseStatusMap: Record<string, string> = {
+      uploaded: 'pending_ocr',
+      processing: 'pending_ocr',
+      to_verify: 'pending_review',
+      verified: 'verified',
+      disputed: 'contested',
+      to_pay: 'approved',
+      paid: 'paid',
+    };
 
     const conditions: any[] = [
       eq(invoices.tenantId, tenantId),
@@ -34,7 +47,8 @@ export class InvoiceService {
     ];
 
     if (filters.status) {
-      conditions.push(eq(invoices.status, filters.status as any));
+      const internalStatus = reverseStatusMap[filters.status] || filters.status;
+      conditions.push(eq(invoices.status, internalStatus as any));
     }
 
     if (filters.supplierId) {
@@ -87,12 +101,43 @@ export class InvoiceService {
       .from(invoices)
       .leftJoin(suppliers, eq(invoices.supplierId, suppliers.id))
       .where(whereClause)
-      .orderBy(desc(invoices.createdAt))
+      .orderBy(
+        (filters.sortDir === 'asc' ? asc : desc)(
+          filters.sortBy === 'issueDate' || filters.sortBy === 'invoiceDate'
+            ? invoices.invoiceDate
+            : filters.sortBy === 'totalAmount'
+              ? invoices.totalAmount
+              : filters.sortBy === 'dueDate'
+                ? invoices.dueDate
+                : filters.sortBy === 'invoiceNumber'
+                  ? invoices.invoiceNumber
+                  : invoices.createdAt,
+        ),
+      )
       .limit(pageSize)
       .offset((page - 1) * pageSize);
 
+    // Map internal statuses to frontend-expected statuses
+    const statusMap: Record<string, string> = {
+      pending_ocr: 'uploaded',
+      pending_review: 'to_verify',
+      verified: 'verified',
+      contested: 'disputed',
+      approved: 'to_pay',
+      paid: 'paid',
+    };
+
+    const data = rows.map((row: any) => ({
+      ...row,
+      issueDate: row.invoiceDate,
+      totalAmount: parseFloat(row.totalAmount || '0'),
+      vatAmount: parseFloat(row.vatAmount || '0'),
+      status: statusMap[row.status] || row.status,
+      isReconciled: row.reconciliationStatus != null,
+    }));
+
     return {
-      data: rows,
+      data,
       pagination: {
         page,
         pageSize,

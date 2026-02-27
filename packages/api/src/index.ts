@@ -1,7 +1,10 @@
+import { config } from 'dotenv';
+import { resolve } from 'path';
+config({ path: resolve(__dirname, '../../../.env') });
+
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
-import rateLimit from '@fastify/rate-limit';
 import multipart from '@fastify/multipart';
 import fastifyJwt from '@fastify/jwt';
 import cookie from '@fastify/cookie';
@@ -16,6 +19,7 @@ import { receivingRoutes } from './routes/receivings';
 import { invoiceRoutes } from './routes/invoices';
 import { analyticsRoutes } from './routes/analytics';
 import { notificationRoutes } from './routes/notifications';
+import { shoppingListRoutes } from './routes/shopping-list';
 
 const envToLogger: Record<string, any> = {
   development: {
@@ -41,7 +45,6 @@ async function buildApp() {
     credentials: true,
   });
   await app.register(helmet);
-  await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
   await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB
   await app.register(fastifyJwt, {
     secret: process.env.JWT_SECRET || 'change-me-in-production',
@@ -68,6 +71,7 @@ async function buildApp() {
       await api.register(invoiceRoutes, { prefix: '/invoices' });
       await api.register(analyticsRoutes, { prefix: '/analytics' });
       await api.register(notificationRoutes, { prefix: '/notifications' });
+      await api.register(shoppingListRoutes, { prefix: '/shopping-list' });
     },
     { prefix: '/api/v1' },
   );

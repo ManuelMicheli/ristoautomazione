@@ -7,6 +7,8 @@ export const listInvoicesQuerySchema = z.object({
   supplierId: z.string().uuid().optional(),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
+  sortBy: z.enum(['invoiceDate', 'issueDate', 'totalAmount', 'dueDate', 'createdAt', 'invoiceNumber', 'supplierName']).optional().default('createdAt'),
+  sortDir: z.enum(['asc', 'desc']).optional().default('desc'),
 });
 
 export const invoiceLineSchema = z.object({

@@ -670,12 +670,18 @@ export class ReceivingService {
       )
       .orderBy(purchaseOrders.expectedDeliveryDate);
 
-    // Group by time period
-    const today: typeof orders = [];
-    const thisWeek: typeof orders = [];
-    const later: typeof orders = [];
+    // Coerce totalAmount from string to number
+    const enrichedOrders = orders.map((o: any) => ({
+      ...o,
+      totalAmount: parseFloat(o.totalAmount || '0'),
+    }));
 
-    for (const order of orders) {
+    // Group by time period
+    const today: typeof enrichedOrders = [];
+    const thisWeek: typeof enrichedOrders = [];
+    const later: typeof enrichedOrders = [];
+
+    for (const order of enrichedOrders) {
       if (!order.expectedDeliveryDate) {
         later.push(order);
         continue;
@@ -691,7 +697,7 @@ export class ReceivingService {
       }
     }
 
-    return { today, thisWeek, later, total: orders.length };
+    return { today, thisWeek, later, total: enrichedOrders.length };
   }
 
   /**

@@ -1,14 +1,21 @@
 import { Queue } from 'bullmq';
-import Redis from 'ioredis';
 
-const connection = new Redis(
-  process.env.REDIS_URL || 'redis://localhost:6379',
-  { maxRetriesPerRequest: null },
-);
+function getConnection() {
+  const url = process.env.REDIS_URL;
+  if (!url) return null;
+  // Dynamic require to avoid loading ioredis when Redis not configured
+  const Redis = require('ioredis').default || require('ioredis');
+  return new Redis(url, { maxRetriesPerRequest: null });
+}
 
-export const ocrQueue = new Queue('ocr', { connection });
-export const emailQueue = new Queue('email', { connection });
-export const scoringQueue = new Queue('scoring', { connection });
-export const reportQueue = new Queue('report', { connection });
+const connection = getConnection();
+
+// Queues are no-ops when Redis is not available
+const noopQueue = { add: async () => ({}) } as any;
+
+export const ocrQueue = connection ? new Queue('ocr', { connection }) : noopQueue;
+export const emailQueue = connection ? new Queue('email', { connection }) : noopQueue;
+export const scoringQueue = connection ? new Queue('scoring', { connection }) : noopQueue;
+export const reportQueue = connection ? new Queue('report', { connection }) : noopQueue;
 
 export { connection as redisConnection };

@@ -39,6 +39,8 @@ export const listReceivingsQuerySchema = z.object({
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
   status: z.string().optional(), // comma-separated
+  sortBy: z.enum(['createdAt', 'receivedAt', 'status']).optional().default('createdAt'),
+  sortDir: z.enum(['asc', 'desc']).optional().default('desc'),
 });
 
 export const discrepancyReportQuerySchema = z.object({

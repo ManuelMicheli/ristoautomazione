@@ -1,6 +1,5 @@
 import fp from 'fastify-plugin';
 import { FastifyInstance } from 'fastify';
-import Redis from 'ioredis';
 
 // In-memory fallback when Redis is not available
 class InMemoryRedis {
@@ -43,29 +42,37 @@ class InMemoryRedis {
 
 declare module 'fastify' {
   interface FastifyInstance {
-    redis: Redis | InMemoryRedis;
+    redis: InMemoryRedis;
   }
 }
 
 export const redisPlugin = fp(async (app: FastifyInstance) => {
-  let redis: Redis | InMemoryRedis;
+  const redisUrl = process.env.REDIS_URL;
 
-  try {
-    redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-      maxRetriesPerRequest: 1,
-      connectTimeout: 3000,
-      lazyConnect: true,
-    });
-    await (redis as Redis).connect();
-    app.log.info('Connected to Redis');
-  } catch {
-    app.log.warn('Redis not available — using in-memory fallback');
-    redis = new InMemoryRedis();
+  if (redisUrl) {
+    // Dynamic import to avoid loading ioredis when not needed
+    try {
+      const { default: Redis } = await import('ioredis');
+      const ioRedis = new Redis(redisUrl, {
+        maxRetriesPerRequest: 1,
+        retryStrategy: () => null,
+        connectTimeout: 3000,
+        lazyConnect: true,
+      });
+      ioRedis.on('error', () => {});
+      await ioRedis.connect();
+      app.decorate('redis', ioRedis as any);
+      app.log.info('Connected to Redis');
+      app.addHook('onClose', async () => { ioRedis.disconnect(); });
+      return;
+    } catch {
+      app.log.warn('Redis not available — using in-memory fallback');
+    }
+  } else {
+    app.log.warn('REDIS_URL not set — using in-memory fallback');
   }
 
-  app.decorate('redis', redis as any);
-
-  app.addHook('onClose', async () => {
-    redis.disconnect();
-  });
+  const redis = new InMemoryRedis();
+  app.decorate('redis', redis);
+  app.addHook('onClose', async () => { redis.disconnect(); });
 });

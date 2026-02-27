@@ -26,7 +26,7 @@ interface Order {
   orderNumber: string;
   supplierName: string;
   supplierId: string;
-  date: string;
+  createdAt: string;
   status: string;
   totalAmount: number;
   isUrgent: boolean;
@@ -92,7 +92,7 @@ export default function OrdersListPage() {
   const page = Number(searchParams.get('page') || '1');
   const search = searchParams.get('q') || '';
   const status = searchParams.get('status') || '';
-  const sortBy = searchParams.get('sortBy') || 'date';
+  const sortBy = searchParams.get('sortBy') || 'createdAt';
   const sortDir = (searchParams.get('sortDir') as 'asc' | 'desc') || 'desc';
 
   const setParam = useCallback(
@@ -159,12 +159,12 @@ export default function OrdersListPage() {
         ),
       },
       {
-        key: 'date',
+        key: 'createdAt',
         header: 'Data',
         sortable: true,
         cell: (row) => (
           <span className="text-slate-500 dark:text-slate-400">
-            {formatDate(row.date)}
+            {formatDate(row.createdAt)}
           </span>
         ),
       },

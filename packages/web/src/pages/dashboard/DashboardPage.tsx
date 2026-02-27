@@ -67,7 +67,7 @@ interface RecentOrder {
   supplierName: string;
   status: string;
   totalAmount: number;
-  date: string;
+  createdAt: string;
   isUrgent: boolean;
 }
 
@@ -184,7 +184,7 @@ export default function DashboardPage() {
     queryFn: async () => {
       const res = await apiClient.get<RecentOrder[]>('/orders', {
         pageSize: 5,
-        sortBy: 'date',
+        sortBy: 'createdAt',
         sortDir: 'desc',
       });
       return res.data;
@@ -416,7 +416,7 @@ export default function DashboardPage() {
                       )}
                     </div>
                     <p className="text-xs text-slate-400">
-                      {order.supplierName} - {formatDate(order.date)}
+                      {order.supplierName} - {formatDate(order.createdAt)}
                     </p>
                   </div>
                   <div className="ml-3 flex items-center gap-3">

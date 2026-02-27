@@ -115,3 +115,10 @@ export const reportJobStatusEnum = pgEnum('report_job_status', [
   'completed',
   'failed',
 ]);
+
+export const shoppingFrequencyEnum = pgEnum('shopping_frequency', [
+  'weekly',
+  'biweekly',
+  'monthly',
+  'custom',
+]);

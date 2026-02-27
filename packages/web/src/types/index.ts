@@ -34,12 +34,13 @@ export interface User {
   firstName: string;
   lastName: string;
   role: UserRole;
+  tenantId?: string;
   avatarUrl?: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export type UserRole = 'admin' | 'manager' | 'operator' | 'viewer';
+export type UserRole = 'owner' | 'admin' | 'manager' | 'operator' | 'viewer';
 
 export interface AuthTokens {
   accessToken: string;
@@ -52,8 +53,9 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
+  accessToken: string;
+  refreshToken: string;
   user: User;
-  tokens: AuthTokens;
 }
 
 // Supplier types
