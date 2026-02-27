@@ -52,8 +52,9 @@ export const redisPlugin = fp(async (app: FastifyInstance) => {
   if (redisUrl) {
     // Dynamic import to avoid loading ioredis when not needed
     try {
-      const { default: Redis } = await import('ioredis');
-      const ioRedis = new Redis(redisUrl, {
+      const ioredisModule = await import('ioredis');
+      const Redis = ioredisModule.default ?? ioredisModule;
+      const ioRedis = new (Redis as any)(redisUrl, {
         maxRetriesPerRequest: 1,
         retryStrategy: () => null,
         connectTimeout: 3000,
