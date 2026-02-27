@@ -498,7 +498,7 @@ export class SupplierService {
     db: Db,
     supplierId: string,
     data: {
-      name: string;
+      name?: string;
       role?: string;
       phone?: string;
       email?: string;
@@ -509,7 +509,7 @@ export class SupplierService {
       .insert(supplierContacts)
       .values({
         supplierId,
-        name: data.name,
+        name: data.name!,
         role: data.role || null,
         phone: data.phone || null,
         email: data.email || null,
