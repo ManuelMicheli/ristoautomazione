@@ -1,9 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
   "installCommand": "pnpm install",
   "buildCommand": "pnpm --filter @cph/web exec vite build",
   "outputDirectory": "packages/web/dist",
   "rewrites": [
-    { "source": "/((?!assets|vite\\.svg).*)", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
