@@ -24,12 +24,12 @@ import type { FastifyInstance } from 'fastify';
 type Db = FastifyInstance['db'];
 
 export interface ListSuppliersFilters {
-  page: number;
-  pageSize: number;
+  page?: number;
+  pageSize?: number;
   q?: string;
   category?: string;
-  sortBy: 'businessName' | 'createdAt' | 'category';
-  sortDir: 'asc' | 'desc';
+  sortBy?: 'businessName' | 'createdAt' | 'category';
+  sortDir?: 'asc' | 'desc';
 }
 
 export class SupplierService {
@@ -37,7 +37,12 @@ export class SupplierService {
   // LIST — paginated list with search, filter, sort
   // ---------------------------------------------------------------------------
   async list(db: Db, tenantId: string, filters: ListSuppliersFilters) {
-    const { page, pageSize, q, category, sortBy, sortDir } = filters;
+    const page = filters.page ?? 1;
+    const pageSize = filters.pageSize ?? 20;
+    const q = filters.q;
+    const category = filters.category;
+    const sortBy = filters.sortBy ?? 'businessName';
+    const sortDir = filters.sortDir ?? 'asc';
     const offset = (page - 1) * pageSize;
 
     // Build WHERE conditions
@@ -341,7 +346,7 @@ export class SupplierService {
     db: Db,
     tenantId: string,
     data: {
-      businessName: string;
+      businessName?: string;
       vatNumber?: string;
       paymentTerms?: string;
       deliveryDays?: number[];
@@ -365,7 +370,7 @@ export class SupplierService {
         .insert(suppliers)
         .values({
           tenantId,
-          businessName: supplierData.businessName,
+          businessName: supplierData.businessName!,
           vatNumber: supplierData.vatNumber || null,
           paymentTerms: supplierData.paymentTerms || null,
           deliveryDays: supplierData.deliveryDays || [],
