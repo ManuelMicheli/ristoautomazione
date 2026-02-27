@@ -355,7 +355,7 @@ export class SupplierService {
       notes?: string;
       category?: string;
       contacts?: Array<{
-        name: string;
+        name?: string;
         role?: string;
         phone?: string;
         email?: string;
@@ -388,7 +388,7 @@ export class SupplierService {
         await tx.insert(supplierContacts).values(
           contacts.map((c) => ({
             supplierId: created!.id,
-            name: c.name,
+            name: c.name!,
             role: c.role || null,
             phone: c.phone || null,
             email: c.email || null,
