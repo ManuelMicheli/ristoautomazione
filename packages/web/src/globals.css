@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Light mode defaults */
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
+
+  /* Dark mode overrides */
+  .dark body,
+  html.dark body {
+    @apply bg-slate-900 text-slate-100;
+  }
+
+  /* Smooth transitions for dark mode toggle */
+  * {
+    @apply transition-colors duration-200;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    @apply w-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-primary-400/30;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    @apply bg-primary-400/20;
+  }
+
+  /* Focus ring for accessibility */
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent-green;
+  }
+}
+
+@layer components {
+  /* Reusable card component */
+  .card {
+    @apply rounded-xl border border-primary-200 bg-white p-6 shadow-sm;
+  }
+
+  .dark .card {
+    @apply border-primary-700 bg-primary-800 shadow-lg;
+  }
+
+  /* Sidebar active link */
+  .nav-link-active {
+    @apply bg-accent-green/10 text-accent-green;
+  }
+}

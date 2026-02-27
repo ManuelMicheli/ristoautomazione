@@ -1,0 +1,11 @@
+{
+  "name": "@cph/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui"
+  }
+}
